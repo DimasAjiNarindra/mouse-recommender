@@ -1,4 +1,4 @@
-# app.py - Flask Application
+# app.py - Flask Application (Fixed for Railway Deployment)
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
@@ -27,7 +27,7 @@ except Exception as e:
 def serve_image(filename):
     """API endpoint untuk melayani gambar mouse dengan perbaikan"""
     try:
-        image_folder = recommender.image_folder if recommender else "img"
+        image_folder = recommender.image_folder if recommender else "static/img"
         
         # Bersihkan nama file
         clean_filename = filename.strip()
@@ -129,21 +129,71 @@ def get_info():
 @app.route("/")
 def serve_index():
     """Route untuk menampilkan halaman utama"""
-    return send_from_directory("static", "index.html")
+    try:
+        # Cek apakah file index.html ada
+        if os.path.exists(os.path.join("static", "index.html")):
+            return send_from_directory("static", "index.html")
+        else:
+            # Jika tidak ada, buat response HTML sederhana
+            return """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Mouse Recommendation System</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 40px; }
+                    .container { max-width: 800px; margin: 0 auto; }
+                    .status { padding: 20px; background: #f0f0f0; border-radius: 5px; }
+                    .success { background: #d4edda; color: #155724; }
+                    .error { background: #f8d7da; color: #721c24; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>Mouse Recommendation System</h1>
+                    <div class="status success">
+                        <h2>✅ System Status: Online</h2>
+                        <p>The Mouse Recommendation API is running successfully!</p>
+                        <h3>Available Endpoints:</h3>
+                        <ul>
+                            <li><strong>GET /api/options</strong> - Get available filter options</li>
+                            <li><strong>POST /api/recommendations</strong> - Get mouse recommendations</li>
+                            <li><strong>GET /api/info</strong> - Get system information</li>
+                            <li><strong>GET /health</strong> - Health check</li>
+                        </ul>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """
+    except Exception as e:
+        logging.error(f"Error serving index: {str(e)}")
+        return jsonify({"error": "Failed to serve index page"}), 500
 
 # ========== ROUTE STATIC FILES ==========
 @app.route("/static/<path:filename>")
 def serve_static(filename):
     """Route untuk melayani static files"""
-    return send_from_directory("static", filename)
+    try:
+        return send_from_directory("static", filename)
+    except Exception as e:
+        logging.error(f"Error serving static file {filename}: {str(e)}")
+        return jsonify({"error": "File not found"}), 404
 
 # ========== ROUTE UNTUK CSS DAN JS ==========
 @app.route("/<path:filename>")
 def serve_files(filename):
     """Route untuk melayani file CSS dan JS dari root directory"""
-    if filename.endswith('.css') or filename.endswith('.js'):
-        return send_from_directory(".", filename)
-    return serve_index()
+    try:
+        if filename.endswith('.css') or filename.endswith('.js'):
+            if os.path.exists(filename):
+                return send_from_directory(".", filename)
+            else:
+                return jsonify({"error": "File not found"}), 404
+        return serve_index()
+    except Exception as e:
+        logging.error(f"Error serving file {filename}: {str(e)}")
+        return serve_index()
 
 # ========== HEALTH CHECK ==========
 @app.route("/health")
@@ -151,11 +201,14 @@ def health_check():
     """Health check endpoint"""
     return jsonify({
         "status": "healthy",
+        "message": "Mouse Recommendation System is running",
         "recommendation_system": "initialized" if recommender else "not initialized",
         "dataset_size": recommender.get_system_info().get('total_data', 0) if recommender else 0,
         "model_name": recommender.model_name if recommender else "N/A",
         "image_support": True if recommender else False,
-        "image_folder": recommender.image_folder if recommender else "N/A"
+        "image_folder": recommender.image_folder if recommender else "N/A",
+        "port": os.environ.get('PORT', '5000'),
+        "environment": "production" if os.environ.get('RAILWAY_ENVIRONMENT') else "development"
     })
 
 # ========== ENDPOINT UNTUK DEBUG IMAGES ==========
@@ -232,6 +285,27 @@ def test_system():
             "message": f"System test failed: {str(e)}"
         }), 500
 
+# ========== ERROR HANDLERS ==========
+@app.errorhandler(404)
+def not_found(error):
+    """Handle 404 errors"""
+    return jsonify({"error": "Endpoint not found"}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    """Handle 500 errors"""
+    logging.error(f"Internal server error: {str(error)}")
+    return jsonify({"error": "Internal server error"}), 500
+
 # ========== JALANKAN APP ==========
 if __name__ == '__main__':
-    app.run(debug=False, host='0.0.0.0', port=5000)
+    # Get port from environment variable (Railway sets this)
+    port = int(os.environ.get('PORT', 5000))
+    
+    # Railway requires binding to 0.0.0.0
+    app.run(
+        debug=False, 
+        host='0.0.0.0', 
+        port=port,
+        threaded=True
+    )
