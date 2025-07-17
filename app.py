@@ -238,4 +238,4 @@ if __name__ == '__main__':
     logging.info("Web interface available at: http://127.0.0.1:5000")
     logging.info("Debug images at: http://127.0.0.1:5000/api/debug/images")
     logging.info("Test system at: http://127.0.0.1:5000/api/test")
-    app.run(debug=True, port=5000, host='0.0.0.0')
+    app.run(debug=False, host='0.0.0.0', port=5000)
