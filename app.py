@@ -46,7 +46,7 @@ def serve_index():
             <div class="container">
                 <h1>Mouse Recommendation System</h1>
                 <div class="error">
-                    <h2>❌ Error: Frontend files not found</h2>
+                    <h2> Error: Frontend files not found</h2>
                     <p>Please make sure index.html is in the static folder</p>
                 </div>
             </div>
