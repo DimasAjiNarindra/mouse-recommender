@@ -16,7 +16,8 @@ CORS(app)
 
 # Initialize the ML recommendation system
 try:
-    recommender = MouseRecommendationSystem("Data_Mouse.csv", "static/img")
+    # PERBAIKAN 1: Gunakan path yang sama seperti program pertama
+    recommender = MouseRecommendationSystem("Data_Mouse.csv", "img")
     logging.info("Mouse Recommendation System initialized successfully!")
 except Exception as e:
     logging.error(f"Error initializing recommendation system: {str(e)}")
@@ -27,7 +28,6 @@ except Exception as e:
 def serve_index():
     """Route untuk menampilkan halaman utama"""
     try:
-        # Serve index.html from static folder
         return send_from_directory("static", "index.html")
     except Exception as e:
         logging.error(f"Error serving index: {str(e)}")
@@ -83,40 +83,56 @@ def serve_js():
         logging.error(f"Error serving JS: {str(e)}")
         return jsonify({"error": "JS file not found"}), 404
 
-# ========== API: IMAGE SERVING ==========
+# ========== PERBAIKAN 2: API IMAGE SERVING - SAMA SEPERTI PROGRAM PERTAMA ==========
 @app.route("/api/images/<filename>")
 def serve_image(filename):
     """API endpoint untuk melayani gambar mouse dengan perbaikan"""
     try:
-        image_folder = recommender.image_folder if recommender else "static/img"
+        # PERBAIKAN: Gunakan path yang sama seperti program pertama
+        image_folder = "img"  # Langsung ke folder img
         
         # Bersihkan nama file
         clean_filename = filename.strip()
-        image_path = os.path.join(image_folder, clean_filename)
         
-        # Cek apakah file ada
+        # PERBAIKAN: Cek apakah file ada di folder img
+        image_path = os.path.join(image_folder, clean_filename)
         if os.path.exists(image_path):
             return send_from_directory(image_folder, clean_filename)
         
+        # PERBAIKAN: Jika tidak ada di img, coba di static/img
+        static_image_folder = "static/img"
+        static_image_path = os.path.join(static_image_folder, clean_filename)
+        if os.path.exists(static_image_path):
+            return send_from_directory(static_image_folder, clean_filename)
+        
         # Coba cari file dengan nama serupa (case-insensitive)
-        if os.path.exists(image_folder):
-            for file in os.listdir(image_folder):
-                if file.lower() == clean_filename.lower():
-                    return send_from_directory(image_folder, file)
+        for folder in [image_folder, static_image_folder]:
+            if os.path.exists(folder):
+                for file in os.listdir(folder):
+                    if file.lower() == clean_filename.lower():
+                        return send_from_directory(folder, file)
         
         # Return default image
         default_images = ["default.jpg", "default.png", "no-image.jpg", "placeholder.jpg"]
-        for default_img in default_images:
-            default_path = os.path.join(image_folder, default_img)
-            if os.path.exists(default_path):
-                return send_from_directory(image_folder, default_img)
+        for folder in [image_folder, static_image_folder]:
+            for default_img in default_images:
+                default_path = os.path.join(folder, default_img)
+                if os.path.exists(default_path):
+                    return send_from_directory(folder, default_img)
         
         # Jika tidak ada default image, return error
+        logging.warning(f"Image not found: {filename}")
         return jsonify({"error": "Image not found"}), 404
         
     except Exception as e:
         logging.error(f"Error serving image {filename}: {str(e)}")
         return jsonify({"error": "Failed to serve image"}), 500
+
+# ========== PERBAIKAN 3: ROUTE TAMBAHAN UNTUK COMPATIBILITY ==========
+@app.route("/img/<filename>")
+def serve_image_direct(filename):
+    """Route langsung untuk gambar (compatibility dengan program pertama)"""
+    return serve_image(filename)
 
 # ========== API: OPTIONS ==========
 @app.route("/api/options")
@@ -160,6 +176,11 @@ def recommend():
         
         logging.info(f"Recommendations generated: {len(recommendations)} items")
         
+        # PERBAIKAN 4: Debug logging untuk image URLs
+        for i, rec in enumerate(recommendations):
+            if 'image' in rec:
+                logging.info(f"Recommendation {i+1}: {rec.get('name', 'Unknown')} - Image: {rec['image']}")
+        
         if not recommendations:
             return jsonify({
                 "recommendations": [],
@@ -202,7 +223,7 @@ def health_check():
         "environment": "production" if os.environ.get('RAILWAY_ENVIRONMENT') else "development"
     })
 
-# ========== ENDPOINT UNTUK DEBUG IMAGES ==========
+# ========== PERBAIKAN 5: ENDPOINT DEBUG IMAGES - DITINGKATKAN ==========
 @app.route("/api/debug/images")
 def debug_images():
     """Debug endpoint untuk cek gambar yang tersedia"""
@@ -210,38 +231,55 @@ def debug_images():
         return jsonify({"error": "Recommendation system not initialized"}), 500
     
     try:
-        image_folder = recommender.image_folder
-        if not os.path.exists(image_folder):
-            return jsonify({"error": f"Image folder '{image_folder}' not found"})
+        # Check multiple possible image folders
+        possible_folders = ["img", "static/img", "static/images"]
+        folder_info = {}
         
-        # List semua file gambar
-        image_files = []
-        for file in os.listdir(image_folder):
-            if file.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')):
-                image_files.append(file)
+        for folder in possible_folders:
+            if os.path.exists(folder):
+                image_files = []
+                for file in os.listdir(folder):
+                    if file.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')):
+                        image_files.append(file)
+                
+                folder_info[folder] = {
+                    "exists": True,
+                    "total_images": len(image_files),
+                    "sample_images": image_files[:5]
+                }
+            else:
+                folder_info[folder] = {
+                    "exists": False,
+                    "total_images": 0,
+                    "sample_images": []
+                }
         
         # Ambil sample mice dari dataset
         sample_mice = []
         if hasattr(recommender, 'df') and recommender.df is not None:
-            for idx, row in recommender.df.head(10).iterrows():
+            for idx, row in recommender.df.head(5).iterrows():
+                image_filename = row.get('Image', 'no-image.jpg')
                 mouse_info = {
-                    'name': row['Name'],
-                    'brand': row['Brand'],
-                    'image_filename': row['Image'],
-                    'image_url': recommender.get_image_url(row['Image']),
-                    'image_exists': os.path.exists(os.path.join(image_folder, row['Image']))
+                    'name': row.get('Name', 'Unknown'),
+                    'brand': row.get('Brand', 'Unknown'),
+                    'image_filename': image_filename,
+                    'image_url': f"/api/images/{image_filename}",
+                    'image_exists_img': os.path.exists(os.path.join("img", image_filename)),
+                    'image_exists_static': os.path.exists(os.path.join("static/img", image_filename))
                 }
                 sample_mice.append(mouse_info)
         
         return jsonify({
-            "image_folder": image_folder,
-            "total_image_files": len(image_files),
-            "available_images": image_files[:20],  # First 20 images
-            "sample_mice": sample_mice
+            "folders": folder_info,
+            "recommender_folder": recommender.image_folder if recommender else "N/A",
+            "sample_mice": sample_mice,
+            "current_working_directory": os.getcwd(),
+            "directory_contents": os.listdir(".")
         })
+        
     except Exception as e:
         logging.error(f"Error in debug_images: {str(e)}")
-        return jsonify({"error": "Failed to debug images"}), 500
+        return jsonify({"error": f"Failed to debug images: {str(e)}"}), 500
 
 # ========== TEST ENDPOINT ==========
 @app.route("/api/test")
@@ -266,7 +304,8 @@ def test_system():
             "message": "System is working properly",
             "options_available": len(options),
             "sample_recommendations": len(sample_recs),
-            "system_info": recommender.get_system_info()
+            "system_info": recommender.get_system_info(),
+            "sample_image_urls": [rec.get('image', 'no-image') for rec in sample_recs[:2]]
         })
         
     except Exception as e:
@@ -292,6 +331,11 @@ def internal_error(error):
 if __name__ == '__main__':
     # Get port from environment variable (Railway sets this)
     port = int(os.environ.get('PORT', 8080))
+    
+    logging.info("Starting Mouse Recommendation System...")
+    logging.info(f"Web interface available at: http://0.0.0.0:{port}")
+    logging.info("Debug images at: /api/debug/images")
+    logging.info("Test system at: /api/test")
     
     # Railway requires binding to 0.0.0.0
     app.run(
