@@ -16,7 +16,7 @@ CORS(app)
 
 # Initialize the ML recommendation system
 try:
-    recommender = MouseRecommendationSystem("Data_Mouse.csv", "img")
+    recommender = MouseRecommendationSystem("Data_Mouse.csv", "static/img")
     logging.info("Mouse Recommendation System initialized successfully!")
 except Exception as e:
     logging.error(f"Error initializing recommendation system: {str(e)}")
