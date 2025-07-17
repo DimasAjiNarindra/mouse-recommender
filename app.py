@@ -22,6 +22,67 @@ except Exception as e:
     logging.error(f"Error initializing recommendation system: {str(e)}")
     recommender = None
 
+# ========== ROUTE UTAMA ==========
+@app.route("/")
+def serve_index():
+    """Route untuk menampilkan halaman utama"""
+    try:
+        # Serve index.html from static folder
+        return send_from_directory("static", "index.html")
+    except Exception as e:
+        logging.error(f"Error serving index: {str(e)}")
+        return """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Mouse Recommendation System</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 40px; }
+                .container { max-width: 800px; margin: 0 auto; }
+                .error { padding: 20px; background: #f8d7da; color: #721c24; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Mouse Recommendation System</h1>
+                <div class="error">
+                    <h2>❌ Error: Frontend files not found</h2>
+                    <p>Please make sure index.html is in the static folder</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+
+# ========== ROUTE STATIC FILES ==========
+@app.route("/static/<path:filename>")
+def serve_static(filename):
+    """Route untuk melayani static files"""
+    try:
+        return send_from_directory("static", filename)
+    except Exception as e:
+        logging.error(f"Error serving static file {filename}: {str(e)}")
+        return jsonify({"error": "File not found"}), 404
+
+# ========== ROUTE UNTUK CSS DAN JS (BACKWARD COMPATIBILITY) ==========
+@app.route("/style.css")
+def serve_css():
+    """Route untuk melayani CSS file"""
+    try:
+        return send_from_directory("static", "style.css")
+    except Exception as e:
+        logging.error(f"Error serving CSS: {str(e)}")
+        return jsonify({"error": "CSS file not found"}), 404
+
+@app.route("/script.js")
+def serve_js():
+    """Route untuk melayani JS file"""
+    try:
+        return send_from_directory("static", "script.js")
+    except Exception as e:
+        logging.error(f"Error serving JS: {str(e)}")
+        return jsonify({"error": "JS file not found"}), 404
+
 # ========== API: IMAGE SERVING ==========
 @app.route("/api/images/<filename>")
 def serve_image(filename):
@@ -124,76 +185,6 @@ def get_info():
     except Exception as e:
         logging.error(f"Error in get_info: {str(e)}")
         return jsonify({"error": "Failed to get system info"}), 500
-
-# ========== ROUTE UTAMA ==========
-@app.route("/")
-def serve_index():
-    """Route untuk menampilkan halaman utama"""
-    try:
-        # Cek apakah file index.html ada
-        if os.path.exists(os.path.join("static", "index.html")):
-            return send_from_directory("static", "index.html")
-        else:
-            # Jika tidak ada, buat response HTML sederhana
-            return """
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Mouse Recommendation System</title>
-                <style>
-                    body { font-family: Arial, sans-serif; margin: 40px; }
-                    .container { max-width: 800px; margin: 0 auto; }
-                    .status { padding: 20px; background: #f0f0f0; border-radius: 5px; }
-                    .success { background: #d4edda; color: #155724; }
-                    .error { background: #f8d7da; color: #721c24; }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <h1>Mouse Recommendation System</h1>
-                    <div class="status success">
-                        <h2>✅ System Status: Online</h2>
-                        <p>The Mouse Recommendation API is running successfully!</p>
-                        <h3>Available Endpoints:</h3>
-                        <ul>
-                            <li><strong>GET /api/options</strong> - Get available filter options</li>
-                            <li><strong>POST /api/recommendations</strong> - Get mouse recommendations</li>
-                            <li><strong>GET /api/info</strong> - Get system information</li>
-                            <li><strong>GET /health</strong> - Health check</li>
-                        </ul>
-                    </div>
-                </div>
-            </body>
-            </html>
-            """
-    except Exception as e:
-        logging.error(f"Error serving index: {str(e)}")
-        return jsonify({"error": "Failed to serve index page"}), 500
-
-# ========== ROUTE STATIC FILES ==========
-@app.route("/static/<path:filename>")
-def serve_static(filename):
-    """Route untuk melayani static files"""
-    try:
-        return send_from_directory("static", filename)
-    except Exception as e:
-        logging.error(f"Error serving static file {filename}: {str(e)}")
-        return jsonify({"error": "File not found"}), 404
-
-# ========== ROUTE UNTUK CSS DAN JS ==========
-@app.route("/<path:filename>")
-def serve_files(filename):
-    """Route untuk melayani file CSS dan JS dari root directory"""
-    try:
-        if filename.endswith('.css') or filename.endswith('.js'):
-            if os.path.exists(filename):
-                return send_from_directory(".", filename)
-            else:
-                return jsonify({"error": "File not found"}), 404
-        return serve_index()
-    except Exception as e:
-        logging.error(f"Error serving file {filename}: {str(e)}")
-        return serve_index()
 
 # ========== HEALTH CHECK ==========
 @app.route("/health")
@@ -300,7 +291,7 @@ def internal_error(error):
 # ========== JALANKAN APP ==========
 if __name__ == '__main__':
     # Get port from environment variable (Railway sets this)
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 8080))
     
     # Railway requires binding to 0.0.0.0
     app.run(
