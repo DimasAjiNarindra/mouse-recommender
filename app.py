@@ -1,4 +1,4 @@
-# app.py - Flask Application (Fixed for Railway Deployment)
+# app.py - Flask Application 
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
@@ -16,7 +16,6 @@ CORS(app)
 
 # Initialize the ML recommendation system
 try:
-    # PERBAIKAN 1: Gunakan path yang sama seperti program pertama
     recommender = MouseRecommendationSystem("Data_Mouse.csv", "img")
     logging.info("Mouse Recommendation System initialized successfully!")
 except Exception as e:
@@ -83,23 +82,20 @@ def serve_js():
         logging.error(f"Error serving JS: {str(e)}")
         return jsonify({"error": "JS file not found"}), 404
 
-# ========== PERBAIKAN 2: API IMAGE SERVING - SAMA SEPERTI PROGRAM PERTAMA ==========
 @app.route("/api/images/<filename>")
 def serve_image(filename):
     """API endpoint untuk melayani gambar mouse dengan perbaikan"""
     try:
-        # PERBAIKAN: Gunakan path yang sama seperti program pertama
+        
         image_folder = "img"  # Langsung ke folder img
         
         # Bersihkan nama file
         clean_filename = filename.strip()
         
-        # PERBAIKAN: Cek apakah file ada di folder img
         image_path = os.path.join(image_folder, clean_filename)
         if os.path.exists(image_path):
             return send_from_directory(image_folder, clean_filename)
         
-        # PERBAIKAN: Jika tidak ada di img, coba di static/img
         static_image_folder = "static/img"
         static_image_path = os.path.join(static_image_folder, clean_filename)
         if os.path.exists(static_image_path):
@@ -128,7 +124,6 @@ def serve_image(filename):
         logging.error(f"Error serving image {filename}: {str(e)}")
         return jsonify({"error": "Failed to serve image"}), 500
 
-# ========== PERBAIKAN 3: ROUTE TAMBAHAN UNTUK COMPATIBILITY ==========
 @app.route("/img/<filename>")
 def serve_image_direct(filename):
     """Route langsung untuk gambar (compatibility dengan program pertama)"""
@@ -176,7 +171,6 @@ def recommend():
         
         logging.info(f"Recommendations generated: {len(recommendations)} items")
         
-        # PERBAIKAN 4: Debug logging untuk image URLs
         for i, rec in enumerate(recommendations):
             if 'image' in rec:
                 logging.info(f"Recommendation {i+1}: {rec.get('name', 'Unknown')} - Image: {rec['image']}")
